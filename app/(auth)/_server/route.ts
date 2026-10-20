@@ -1,6 +1,11 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { ID } from 'node-appwrite';
+import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
+import { createAdminClient, createSessionClient } from './appwrite';
+
+export const SESSION_COOKIE = 'tasker-session';
 
 const loginSchema = z.object({
   email: z.email(),
@@ -13,28 +18,68 @@ const registerSchema = z.object({
   password: z.string().min(8),
 });
 
-// Chain handlers off a single `new Hono()` so the RPC client infers types.
+// Options for the HTTP-only session cookie holding the Appwrite session secret.
+const sessionCookieOptions = (expire: string) =>
+  ({
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Lax',
+    path: '/',
+    expires: new Date(expire),
+  }) as const;
+
 const auth = new Hono()
-  .post('/login', zValidator('json', loginSchema), async (c) => {
-    const { email } = c.req.valid('json');
-
-    // TODO: replace with real authentication. Mock data for now.
-    return c.json({
-      user: { id: 'usr_mock_1', name: 'Mock User', email },
-      token: 'mock-token',
-    });
-  })
   .post('/register', zValidator('json', registerSchema), async (c) => {
-    const { name, email } = c.req.valid('json');
+    const { name, email, password } = c.req.valid('json');
+    const { account } = createAdminClient();
 
-    // TODO: replace with real persistence. Mock data for now.
-    return c.json(
-      {
-        user: { id: 'usr_mock_1', name, email },
-        token: 'mock-token',
-      },
-      201,
-    );
+    try {
+      await account.create({ userId: ID.unique(), email, password, name });
+      const session = await account.createEmailPasswordSession({ email, password });
+      setCookie(c, SESSION_COOKIE, session.secret, sessionCookieOptions(session.expire));
+
+      const user = await createSessionClient(session.secret).account.get();
+      return c.json({ user }, 201);
+    } catch (e) {
+      return c.json({ error: e instanceof Error ? e.message : 'Registration failed' }, 400);
+    }
+  })
+  .post('/login', zValidator('json', loginSchema), async (c) => {
+    const { email, password } = c.req.valid('json');
+    const { account } = createAdminClient();
+
+    try {
+      const session = await account.createEmailPasswordSession({ email, password });
+      setCookie(c, SESSION_COOKIE, session.secret, sessionCookieOptions(session.expire));
+
+      const user = await createSessionClient(session.secret).account.get();
+      return c.json({ user });
+    } catch (e) {
+      return c.json({ error: e instanceof Error ? e.message : 'Invalid credentials' }, 401);
+    }
+  })
+  .get('/me', async (c) => {
+    const session = getCookie(c, SESSION_COOKIE);
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+
+    try {
+      const user = await createSessionClient(session).account.get();
+      return c.json({ user });
+    } catch {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+  })
+  .post('/logout', async (c) => {
+    const session = getCookie(c, SESSION_COOKIE);
+    if (session) {
+      try {
+        await createSessionClient(session).account.deleteSession({ sessionId: 'current' });
+      } catch {
+        // Session may already be invalid; clear the cookie regardless.
+      }
+    }
+    deleteCookie(c, SESSION_COOKIE, { path: '/' });
+    return c.json({ success: true });
   });
 
 export default auth;
