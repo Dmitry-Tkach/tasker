@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tasker
 
-## Getting Started
+A task manager built with Next.js 16 (App Router), React 19, a Hono API, and
+shadcn UI.
 
-First, run the development server:
+**Live:** https://tasker-production-e8a9.up.railway.app/
+
+## Tech stack
+
+- **Framework:** Next.js 16 (App Router) + React 19
+- **API:** [Hono](https://hono.dev) mounted at `/api`, with zod validation and a
+  typed RPC client (`app/api/client.ts`)
+- **UI:** shadcn (base-ui), Tailwind v4, lucide icons, recharts
+- **Data/forms:** TanStack Query, react-hook-form + zod
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Copy `.env.example` to `.env.local` and fill in the values:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cp .env.example .env.local
+```
 
-## Learn More
+| Variable              | Description                                               |
+| --------------------- | --------------------------------------------------------- |
+| `NEXT_PUBLIC_APP_URL` | Public base URL of the app (used by the Hono RPC client). |
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Command         | Description                      |
+| --------------- | -------------------------------- |
+| `npm run dev`   | Start the dev server (port 3000) |
+| `npm run build` | Production build                 |
+| `npm run start` | Serve the production build       |
+| `npm run lint`  | Lint with ESLint                 |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment
 
-## Deploy on Vercel
+Deployed on [Railway](https://railway.app) — auto-deploys on push to `main`,
+built with Nixpacks.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Set `NEXT_PUBLIC_APP_URL` in the Railway service variables to the public
+  domain. It is inlined at build time, so changing it requires a redeploy.
+- CI (lint / typecheck / build on PRs) runs via GitHub Actions.

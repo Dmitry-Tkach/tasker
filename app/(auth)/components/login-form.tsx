@@ -1,3 +1,5 @@
+"use client"
+
 import { cn } from "cn"
 import * as z from "zod";
 import Image from 'next/image'
@@ -6,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import {Form, useForm, SubmitHandler, ErrorMessage} from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import { useLogin } from "../_hooks/use-auth";
 
 import {
   Field,
@@ -32,30 +35,21 @@ export function AuthForm({
   const {
     control,
     register,
-    handleSubmit,
-    formState: { errors },
   } = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       email: "",
       password: "",
-     
     }
   });
 
+  const loginMutation = useLogin();
+
   type FormData = z.infer<typeof formSchema>;
 
-  const onSubmit: SubmitHandler<FormData> = async(data) => {
-    console.log(data, "form sent");
-     const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
-
-      const result = await response.json()
+  const onSubmit: SubmitHandler<FormData> = async (data) => {
+    const result = await loginMutation.mutateAsync(data);
+    console.log("login result", result); // mock data for now
   };
 
   return (

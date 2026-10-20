@@ -1,3 +1,5 @@
+"use client"
+
 import { cn } from "cn"
 import * as z from "zod";
 import Image from 'next/image'
@@ -15,6 +17,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import Link from "next/link";
+import { useRegister } from "../_hooks/use-auth";
 
 const formSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
@@ -33,22 +36,22 @@ export function AuthForm({
   const {
     control,
     register,
-    handleSubmit,
-    formState: { errors },
   } = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
       email: "",
       password: "",
-     
     }
   });
 
+  const registerMutation = useRegister();
+
   type FormData = z.infer<typeof formSchema>;
 
-  const onSubmit: SubmitHandler<FormData> = (data) => {
-    console.log(data);
+  const onSubmit: SubmitHandler<FormData> = async (data) => {
+    const result = await registerMutation.mutateAsync(data);
+    console.log("register result", result); // mock data for now
   };
 
   return (
@@ -57,7 +60,7 @@ export function AuthForm({
       <div className="flex justify-center">
         <Card className="overflow-hidden p-0 w-100">
           <CardContent className="">
-            <Form onSubmit={({data})=> onSubmit(data)} control={control} action="/api/test" method="post">
+            <Form onSubmit={({data})=> onSubmit(data)} control={control} method="post">
               <div className="p-6 md:p-8" >
                 <FieldGroup>
                   <div className="flex flex-col items-center gap-2 text-center">
