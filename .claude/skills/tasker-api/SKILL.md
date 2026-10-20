@@ -12,13 +12,16 @@ and consumed on the client via Hono's typed RPC client (`hc`).
 - **Root handler:** `app/api/[[...route]]/route.ts` — creates
   `new Hono().basePath('/api')`, mounts feature routers, exports the Next
   HTTP method handlers and the `AppType`.
-- **Feature routers:** `app/(feature)/server/route.ts` — one `new Hono()` per
-  feature, exported `default`. Current: `app/(auth)/server/route.ts`.
+- **Feature routers:** `app/(feature)/_server/route.ts` — one `new Hono()` per
+  feature, exported `default`. Current: `app/(auth)/_server/route.ts`.
+  ⚠️ The folder MUST be a private folder (`_server`, underscore-prefixed) so
+  Next.js doesn't treat `route.ts` as a Route Handler and fail type-checking
+  (`TS2559`). Don't name it plain `server/`.
 - **RPC client:** `app/api/client.ts` — `hc<AppType>(baseUrl)`.
 
 ## Add a new endpoint — recipe
 
-1. **Define/extend the feature router** (e.g. `app/(tasks)/server/route.ts`):
+1. **Define/extend the feature router** (e.g. `app/(tasks)/_server/route.ts`):
    ```ts
    import { Hono } from 'hono';
    import { zValidator } from '@hono/zod-validator';
@@ -37,7 +40,7 @@ and consumed on the client via Hono's typed RPC client (`hc`).
 
 2. **Mount it** in `app/api/[[...route]]/route.ts`:
    ```ts
-   import tasks from '@/app/(tasks)/server/route';
+   import tasks from '@/app/(tasks)/_server/route';
    const routes = app.route('/auth', auth).route('/tasks', tasks);
    ```
    Keep assigning the chained result to `routes` — `AppType = typeof routes`
