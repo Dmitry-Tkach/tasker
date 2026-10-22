@@ -1,46 +1,25 @@
 "use client"
 
 import { useState } from "react"
-import * as z from "zod"
 import Link from "next/link"
-import { Form, useForm, SubmitHandler, ErrorMessage } from "react-hook-form"
+import { Form, useForm, SubmitHandler } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import {
-  CircleAlertIcon,
-  EyeIcon,
-  EyeOffIcon,
-  LinkIcon,
-  ShieldCheckIcon,
-} from "lucide-react"
+import type * as z from "zod"
+import { EyeIcon, EyeOffIcon, LinkIcon, ShieldCheckIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { applyServerError } from "@/lib/form-errors"
+import { FormAlert } from "@/components/form/form-alert"
+import { FormInput } from "@/components/form/form-input"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Field, FieldDescription, FieldGroup } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
-import { RecoveryLinkError, useResetPassword } from "../_hooks/use-auth"
+import { PASSWORD_MIN, resetPasswordFormSchema } from "../_lib/schemas"
+import { useResetPassword } from "../_hooks/use-auth"
 import { AuthHeader, AuthStatus } from "./auth-status"
 
-// Same rule as register-form (Appwrite also requires 8+ characters).
-const formSchema = z
-  .object({
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string().min(1, "Confirm your new password"),
-  })
-  .refine((values) => values.password === values.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
-  })
-
-type FormData = z.infer<typeof formSchema>
+type FormData = z.infer<typeof resetPasswordFormSchema>
 
 interface ResetPasswordFormProps extends React.ComponentProps<"div"> {
   userId?: string
@@ -55,10 +34,10 @@ export function ResetPasswordForm({
 }: ResetPasswordFormProps) {
   const {
     control,
-    register,
+    setError,
     formState: { errors },
   } = useForm({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(resetPasswordFormSchema),
     defaultValues: {
       password: "",
       confirmPassword: "",
@@ -76,14 +55,15 @@ export function ResetPasswordForm({
         secret,
         password: data.password,
       })
-    } catch {
-      // Error is rendered from resetPasswordMutation.error
+    } catch (error) {
+      // RECOVERY_LINK_INVALID switches to the "link invalid" view below.
+      applyServerError(error, setError, ["password"])
     }
   }
 
   const isPending = resetPasswordMutation.isPending
-  const submitError = resetPasswordMutation.error
-  const isLinkInvalid = !userId || !secret || submitError instanceof RecoveryLinkError
+  const isLinkInvalid =
+    !userId || !secret || resetPasswordMutation.error?.code === "RECOVERY_LINK_INVALID"
 
   let content: React.ReactNode
 
@@ -125,25 +105,26 @@ export function ResetPasswordForm({
         onSubmit={({ data }) => onSubmit(data)}
         control={control}
         method="post"
-        noValidate
       >
         <FieldGroup>
           <AuthHeader subtitle="Choose a new password for your account." />
 
-          {submitError && (
-            <Alert variant="destructive">
-              <CircleAlertIcon aria-hidden="true" />
-              <AlertDescription>{submitError.message}</AlertDescription>
-            </Alert>
-          )}
+          <FormAlert message={errors.root?.server?.message} />
 
-          <Field data-invalid={!!errors.password}>
-            <div className="flex items-center">
-              <FieldLabel htmlFor="password">New password</FieldLabel>
+          <FormInput
+            control={control}
+            name="password"
+            label="New password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="new-password"
+            description={`At least ${PASSWORD_MIN} characters.`}
+            autoFocus
+            labelAction={
               <button
                 type="button"
-                className="ml-auto inline-flex items-center gap-1 text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                className="inline-flex items-center gap-1 text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                 aria-controls="password confirmPassword"
+                aria-pressed={showPassword}
                 onClick={() => setShowPassword((v) => !v)}
               >
                 {showPassword ? (
@@ -154,42 +135,15 @@ export function ResetPasswordForm({
                 {showPassword ? "Hide" : "Show"}
                 <span className="sr-only"> passwords</span>
               </button>
-            </div>
-            <Input
-              {...register("password")}
-              id="password"
-              type={showPassword ? "text" : "password"}
-              autoComplete="new-password"
-              aria-invalid={!!errors.password}
-              aria-describedby={errors.password ? "password-error" : "password-hint"}
-              autoFocus
-            />
-            {errors.password ? (
-              <ErrorMessage
-                control={control}
-                name="password"
-                render={({ message }) => <FieldError id="password-error">{message}</FieldError>}
-              />
-            ) : (
-              <FieldDescription id="password-hint">At least 8 characters.</FieldDescription>
-            )}
-          </Field>
-          <Field data-invalid={!!errors.confirmPassword}>
-            <FieldLabel htmlFor="confirmPassword">Confirm new password</FieldLabel>
-            <Input
-              {...register("confirmPassword")}
-              id="confirmPassword"
-              type={showPassword ? "text" : "password"}
-              autoComplete="new-password"
-              aria-invalid={!!errors.confirmPassword}
-              aria-describedby={errors.confirmPassword ? "confirmPassword-error" : undefined}
-            />
-            <ErrorMessage
-              control={control}
-              name="confirmPassword"
-              render={({ message }) => <FieldError id="confirmPassword-error">{message}</FieldError>}
-            />
-          </Field>
+            }
+          />
+          <FormInput
+            control={control}
+            name="confirmPassword"
+            label="Confirm new password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="new-password"
+          />
           <Field>
             <Button type="submit" variant="primary" disabled={isPending}>
               {isPending && <Spinner aria-hidden="true" />}

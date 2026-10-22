@@ -1,8 +1,13 @@
 import { Hono } from 'hono';
-import { ID } from 'node-appwrite';
+import { AppwriteException, ID } from 'node-appwrite';
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
 import { createAdminClient, createSessionClient } from './appwrite';
-import { loginSchema, registerSchema } from '../_lib/schemas';
+import {
+  forgotPasswordSchema,
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+} from '../_lib/schemas';
 import { UNAUTHORIZED, fromAppwrite, validate } from '@/app/api/_lib/errors';
 
 export const SESSION_COOKIE = 'tasker-session';
@@ -76,6 +81,34 @@ const auth = new Hono()
       }
     }
     deleteCookie(c, SESSION_COOKIE, { path: '/' });
+    return c.json({ success: true });
+  })
+  .post('/recovery', validate('json', forgotPasswordSchema), async (c) => {
+    const { email } = c.req.valid('json');
+    const { account } = createAdminClient();
+    // Appwrite emails a link to /reset-password?userId=...&secret=... The
+    // host must be registered as a Web platform in the Appwrite project.
+    const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(c.req.url).origin;
+
+    try {
+      await account.createRecovery({ email, url: `${origin}/reset-password` });
+    } catch (e) {
+      // Answer an unknown email exactly like a known one, so this endpoint
+      // can't be used to find out which emails have accounts.
+      const unknownEmail = e instanceof AppwriteException && e.code === 404;
+      if (!unknownEmail) throw fromAppwrite(e, 'recovery-request');
+    }
+    return c.json({ success: true });
+  })
+  .put('/recovery', validate('json', resetPasswordSchema), async (c) => {
+    const { userId, secret, password } = c.req.valid('json');
+    const { account } = createAdminClient();
+
+    try {
+      await account.updateRecovery({ userId, secret, password });
+    } catch (e) {
+      throw fromAppwrite(e, 'recovery');
+    }
     return c.json({ success: true });
   });
 

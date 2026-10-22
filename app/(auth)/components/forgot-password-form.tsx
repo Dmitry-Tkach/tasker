@@ -1,48 +1,29 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import * as z from "zod"
+import { useState } from "react"
 import Link from "next/link"
-import { Form, useForm, SubmitHandler, ErrorMessage } from "react-hook-form"
+import { Form, useForm, SubmitHandler } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowLeftIcon, CircleAlertIcon, MailCheckIcon } from "lucide-react"
+import type * as z from "zod"
+import { ArrowLeftIcon, MailCheckIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ApiError } from "@/lib/api-error"
+import { applyServerError } from "@/lib/form-errors"
+import { FormAlert } from "@/components/form/form-alert"
+import { FormInput } from "@/components/form/form-input"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Field, FieldDescription, FieldGroup } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
+import { forgotPasswordSchema } from "../_lib/schemas"
 import { useForgotPassword } from "../_hooks/use-auth"
+import { RATE_LIMIT_COOLDOWN_SECONDS, useCooldown } from "../_hooks/use-cooldown"
 import { AuthHeader, AuthStatus } from "./auth-status"
 
 const RESEND_COOLDOWN_SECONDS = 30
 
-const formSchema = z.object({
-  email: z.email("Enter a valid email address"),
-})
-
-type FormData = z.infer<typeof formSchema>
-
-/** Counts down from `seconds` to 0 once started. */
-function useCooldown() {
-  const [remaining, setRemaining] = useState(0)
-
-  useEffect(() => {
-    if (remaining <= 0) return
-    const id = setTimeout(() => setRemaining((s) => s - 1), 1000)
-    return () => clearTimeout(id)
-  }, [remaining])
-
-  return [remaining, setRemaining] as const
-}
+type FormData = z.infer<typeof forgotPasswordSchema>
 
 export function ForgotPasswordForm({
   className,
@@ -50,10 +31,10 @@ export function ForgotPasswordForm({
 }: React.ComponentProps<"div">) {
   const {
     control,
-    register,
+    setError,
     formState: { errors },
   } = useForm({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
       email: "",
     },
@@ -62,16 +43,18 @@ export function ForgotPasswordForm({
   const forgotPasswordMutation = useForgotPassword()
   const [sentTo, setSentTo] = useState<string | null>(null)
   const [resent, setResent] = useState(false)
-  const [cooldown, startCooldown] = useCooldown()
+  const [resendCooldown, startResendCooldown] = useCooldown()
+  const [rateLimitCooldown, startRateLimitCooldown] = useCooldown()
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     try {
       await forgotPasswordMutation.mutateAsync(data)
       setSentTo(data.email)
       setResent(false)
-      startCooldown(RESEND_COOLDOWN_SECONDS)
-    } catch {
-      // Error is rendered from forgotPasswordMutation.error
+      startResendCooldown(RESEND_COOLDOWN_SECONDS)
+    } catch (error) {
+      const apiError = applyServerError(error, setError, ["email"])
+      if (apiError.code === "RATE_LIMITED") startRateLimitCooldown(RATE_LIMIT_COOLDOWN_SECONDS)
     }
   }
 
@@ -81,14 +64,16 @@ export function ForgotPasswordForm({
     try {
       await forgotPasswordMutation.mutateAsync({ email: sentTo })
       setResent(true)
-      startCooldown(RESEND_COOLDOWN_SECONDS)
-    } catch {
-      // Error is rendered from forgotPasswordMutation.error
+      startResendCooldown(RESEND_COOLDOWN_SECONDS)
+    } catch (error) {
+      // The message is rendered from forgotPasswordMutation.error below.
+      if (error instanceof ApiError && error.code === "RATE_LIMITED") {
+        startResendCooldown(RATE_LIMIT_COOLDOWN_SECONDS)
+      }
     }
   }
 
   const isPending = forgotPasswordMutation.isPending
-  const submitError = forgotPasswordMutation.error
 
   return (
     <div className={cn("flex flex-col gap-6 justify-center px-4", className)} {...props}>
@@ -115,12 +100,7 @@ export function ForgotPasswordForm({
                     )}
                   </div>
 
-                  {submitError && (
-                    <Alert variant="destructive">
-                      <CircleAlertIcon aria-hidden="true" />
-                      <AlertDescription>{submitError.message}</AlertDescription>
-                    </Alert>
-                  )}
+                  <FormAlert message={forgotPasswordMutation.error?.message} />
 
                   <Field>
                     <Link href="/login" className={buttonVariants({ variant: "primary" })}>
@@ -131,13 +111,13 @@ export function ForgotPasswordForm({
                       type="button"
                       variant="outline"
                       onClick={onResend}
-                      disabled={isPending || cooldown > 0}
+                      disabled={isPending || resendCooldown > 0}
                     >
                       {isPending && <Spinner aria-hidden="true" />}
                       {isPending
                         ? "Sending…"
-                        : cooldown > 0
-                          ? `Resend email in ${cooldown}s`
+                        : resendCooldown > 0
+                          ? `Resend email in ${resendCooldown}s`
                           : "Resend email"}
                     </Button>
                   </Field>
@@ -149,6 +129,7 @@ export function ForgotPasswordForm({
                       className="underline underline-offset-4 hover:text-primary"
                       onClick={() => {
                         forgotPasswordMutation.reset()
+                        startResendCooldown(0)
                         setSentTo(null)
                       }}
                     >
@@ -161,40 +142,29 @@ export function ForgotPasswordForm({
                   onSubmit={({ data }) => onSubmit(data)}
                   control={control}
                   method="post"
-                  noValidate
                 >
                   <FieldGroup>
                     <AuthHeader subtitle="Forgot your password? Enter your email and we'll send you a reset link." />
 
-                    {submitError && (
-                      <Alert variant="destructive">
-                        <CircleAlertIcon aria-hidden="true" />
-                        <AlertDescription>{submitError.message}</AlertDescription>
-                      </Alert>
-                    )}
+                    <FormAlert message={errors.root?.server?.message} />
 
-                    <Field data-invalid={!!errors.email}>
-                      <FieldLabel htmlFor="email">Email</FieldLabel>
-                      <Input
-                        {...register("email")}
-                        id="email"
-                        type="email"
-                        autoComplete="email"
-                        placeholder="m@example.com"
-                        aria-invalid={!!errors.email}
-                        aria-describedby={errors.email ? "email-error" : undefined}
-                        autoFocus
-                      />
-                      <ErrorMessage
-                        control={control}
-                        name="email"
-                        render={({ message }) => <FieldError id="email-error">{message}</FieldError>}
-                      />
-                    </Field>
+                    <FormInput
+                      control={control}
+                      name="email"
+                      label="Email"
+                      type="email"
+                      autoComplete="email"
+                      placeholder="m@example.com"
+                      autoFocus
+                    />
                     <Field>
-                      <Button type="submit" variant="primary" disabled={isPending}>
+                      <Button type="submit" variant="primary" disabled={isPending || rateLimitCooldown > 0}>
                         {isPending && <Spinner aria-hidden="true" />}
-                        {isPending ? "Sending link…" : "Send reset link"}
+                        {isPending
+                          ? "Sending link…"
+                          : rateLimitCooldown > 0
+                            ? `Try again in ${rateLimitCooldown}s`
+                            : "Send reset link"}
                       </Button>
                     </Field>
                     <FieldDescription className="text-center">

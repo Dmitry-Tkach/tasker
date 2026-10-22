@@ -50,7 +50,8 @@ const PASSWORD_POLICY_MESSAGES: Record<string, string> = {
   password_personal_data: 'Your password can’t contain your name or email.',
 };
 
-type AppwriteContext = 'login' | 'register' | 'recovery' | 'session';
+// 'recovery-request' sends the reset email; 'recovery' completes the reset.
+type AppwriteContext = 'login' | 'register' | 'recovery-request' | 'recovery' | 'session';
 
 /**
  * Maps an Appwrite error to a safe public ApiHttpError. Appwrite's own message

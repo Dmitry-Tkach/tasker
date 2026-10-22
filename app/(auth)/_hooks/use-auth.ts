@@ -23,59 +23,20 @@ export const useRegister = () =>
     mutationFn: (json) => unwrap(register({ json })),
   });
 
-// ---------------------------------------------------------------------------
-// Password recovery
-//
-// Appwrite flow:
-//   1. account.createRecovery(email, `${origin}/reset-password`) emails a link
-//      to /reset-password?userId=...&secret=...
-//   2. account.updateRecovery(userId, secret, password) sets the new password.
-//
-// The mutation functions below are MOCKS so every UI state (pending, error,
-// success) can be exercised before the API exists. Mock triggers:
-//   - forgot: an email containing "fail" rejects with a generic error.
-//   - reset:  secret "expired" rejects with RecoveryLinkError; a password
-//             containing "fail" rejects with a generic error.
-// ---------------------------------------------------------------------------
+const requestRecovery = client.api.auth.recovery.$post;
+const confirmRecovery = client.api.auth.recovery.$put;
 
-export type ForgotPasswordInput = { email: string };
-export type ResetPasswordInput = { userId: string; secret: string; password: string };
+export type ForgotPasswordInput = InferRequestType<typeof requestRecovery>['json'];
+export type ResetPasswordInput = InferRequestType<typeof confirmRecovery>['json'];
 
-/** Thrown when the recovery link is invalid, already used, or expired. */
-export class RecoveryLinkError extends Error {
-  constructor(message = 'This reset link is invalid or has expired.') {
-    super(message);
-    this.name = 'RecoveryLinkError';
-  }
-}
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// TODO: wire to API (POST /api/auth/recovery -> account.createRecovery)
-async function requestPasswordRecovery({ email }: ForgotPasswordInput) {
-  await delay(1200);
-  if (email.includes('fail')) {
-    throw new Error('We couldn’t send the email right now. Please try again.');
-  }
-  return { ok: true as const };
-}
-
-// TODO: wire to API (PUT /api/auth/recovery -> account.updateRecovery)
-async function confirmPasswordRecovery({ secret, password }: ResetPasswordInput) {
-  await delay(1200);
-  if (secret === 'expired') throw new RecoveryLinkError();
-  if (password.includes('fail')) {
-    throw new Error('We couldn’t update your password. Please try again.');
-  }
-  return { ok: true as const };
-}
-
+// Sends the reset email. Succeeds for unknown emails too (no account enumeration).
 export const useForgotPassword = () =>
-  useMutation<{ ok: true }, Error, ForgotPasswordInput>({
-    mutationFn: requestPasswordRecovery,
+  useMutation<InferResponseType<typeof requestRecovery, 200>, ApiError, ForgotPasswordInput>({
+    mutationFn: (json) => unwrap(requestRecovery({ json })),
   });
 
+// Sets the new password. An invalid/expired link fails with code RECOVERY_LINK_INVALID.
 export const useResetPassword = () =>
-  useMutation<{ ok: true }, Error, ResetPasswordInput>({
-    mutationFn: confirmPasswordRecovery,
+  useMutation<InferResponseType<typeof confirmRecovery, 200>, ApiError, ResetPasswordInput>({
+    mutationFn: (json) => unwrap(confirmRecovery({ json })),
   });
