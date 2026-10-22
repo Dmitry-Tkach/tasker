@@ -71,14 +71,16 @@ export function createRateLimiter({
 }
 
 /**
- * The caller's IP. Railway's proxy appends the real client address to
- * X-Forwarded-For, so the last entry is the one we can trust; earlier entries
- * are whatever the client sent and could be spoofed.
+ * The caller's IP. Railway's edge proxy sets X-Real-IP to the client's address
+ * (its documented header). X-Forwarded-For is only a fallback for other
+ * hosts/local dev: on Railway it passes client-supplied values through, so it
+ * can be spoofed (verified against production).
  */
 export function getClientIp(c: Context): string {
+  const realIp = c.req.header('x-real-ip')?.trim();
+  if (realIp) return realIp;
   const forwarded = c.req.header('x-forwarded-for');
-  const last = forwarded?.split(',').at(-1)?.trim();
-  return last || c.req.header('x-real-ip') || 'unknown';
+  return forwarded?.split(',').at(-1)?.trim() || 'unknown';
 }
 
 function formatWait(seconds: number) {

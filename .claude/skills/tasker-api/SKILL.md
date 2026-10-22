@@ -119,8 +119,9 @@ configured `limiters`. Over the limit it throws a 429 `RATE_LIMITED`
 - Per account: call `limiters.<name>.check(key)` inside the handler after
   validation, e.g. login uses `${ip}:${email}`. Don't key lockouts by email
   alone, or anyone can lock a real user out.
-- Client IP comes from `getClientIp(c)`: the **last** `X-Forwarded-For` entry
-  (the one Railway's proxy adds), not the first, which the client controls.
+- Client IP comes from `getClientIp(c)`: Railway's `X-Real-IP` header.
+  Don't key on `X-Forwarded-For` — on Railway it carries client-supplied
+  values, so it can be spoofed to dodge the limits (verified in production).
 - Counters live in process memory: they reset on restart/deploy and aren't
   shared between instances. Move the store to Redis before running more than
   one Railway replica.
