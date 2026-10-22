@@ -99,20 +99,18 @@ export function AuthForm({
                     <ErrorMessage control={control} name="email" render={({ message }) => <p>{message}</p>}/>
                   </Field>
                   <Field>
-                    <div className="flex items-center">
-                      <FieldLabel htmlFor="password">Password</FieldLabel>
-                      <a
-                        href="#"
-                        className="ml-auto text-sm underline-offset-2 hover:underline"
-                      >
-                        Forgot your password?
-                      </a>
-                    </div>
+                    <FieldLabel htmlFor="password">Password</FieldLabel>
                     <Input {...register("password", { required: "This field is required." })} id="password" type="password" required />
                   </Field>
                   <ErrorMessage control={control} name="password" render={({ message }) => <p>{message}</p>}/>
+                  <Link
+                    href="/forgot-password"
+                    className="-mt-5 self-end text-sm underline-offset-2 hover:underline"
+                  >
+                    Forgot your password?
+                  </Link>
                   <Field>
-                    <Button type="submit" variant="primary">Login</Button>
+                    <Button type="submit" variant="primary">Create account</Button>
                   </Field>
                   <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
                     Or continue with
