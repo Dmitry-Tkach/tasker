@@ -87,12 +87,12 @@ export function AuthForm({
                   <Field>
                     <div className="flex items-center">
                       <FieldLabel htmlFor="password">Password</FieldLabel>
-                      <a
-                        href="#"
+                      <Link
+                        href="/forgot-password"
                         className="ml-auto text-sm underline-offset-2 hover:underline"
                       >
                         Forgot your password?
-                      </a>
+                      </Link>
                     </div>
                     <Input {...register("password")} id="password" type="password" required />
                     <ErrorMessage control={control} name="password" render={({ message }) => <p>{message}</p>}/>
