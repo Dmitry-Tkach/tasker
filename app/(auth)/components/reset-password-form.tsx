@@ -17,6 +17,7 @@ import { Field, FieldDescription, FieldGroup } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
 import { PASSWORD_MIN, resetPasswordFormSchema } from "../_lib/schemas"
 import { useResetPassword } from "../_hooks/use-auth"
+import { formatCooldown, rateLimitWait, useCooldown } from "../_hooks/use-cooldown"
 import { AuthHeader, AuthStatus } from "./auth-status"
 
 type FormData = z.infer<typeof resetPasswordFormSchema>
@@ -46,6 +47,7 @@ export function ResetPasswordForm({
 
   const resetPasswordMutation = useResetPassword()
   const [showPassword, setShowPassword] = useState(false)
+  const [cooldown, startCooldown] = useCooldown()
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     if (!userId || !secret) return
@@ -57,7 +59,8 @@ export function ResetPasswordForm({
       })
     } catch (error) {
       // RECOVERY_LINK_INVALID switches to the "link invalid" view below.
-      applyServerError(error, setError, ["password"])
+      const apiError = applyServerError(error, setError, ["password"])
+      if (apiError.code === "RATE_LIMITED") startCooldown(rateLimitWait(apiError))
     }
   }
 
@@ -145,9 +148,13 @@ export function ResetPasswordForm({
             autoComplete="new-password"
           />
           <Field>
-            <Button type="submit" variant="primary" disabled={isPending}>
+            <Button type="submit" variant="primary" disabled={isPending || cooldown > 0}>
               {isPending && <Spinner aria-hidden="true" />}
-              {isPending ? "Updating password…" : "Reset password"}
+              {isPending
+                ? "Updating password…"
+                : cooldown > 0
+                  ? `Try again in ${formatCooldown(cooldown)}`
+                  : "Reset password"}
             </Button>
           </Field>
           <FieldDescription className="text-center">

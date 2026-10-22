@@ -108,3 +108,21 @@ Client: hooks use `unwrap`, so `mutation.error` is an `ApiError`
 (`status`, `code`, `message`, `fields`; `status` 0 + `NETWORK` for offline).
 `QueryProvider` doesn't retry 4xx queries or any mutation. For forms, see the
 error pattern in `tasker-ui`.
+
+## Rate limiting
+`app/api/_lib/rate-limit.ts` holds an in-memory fixed-window limiter and the
+configured `limiters`. Over the limit it throws a 429 `RATE_LIMITED`
+`ApiHttpError` with `retryAfter` (seconds); `onError` also sets the
+`Retry-After` header, and the forms count down from `retryAfter`.
+- Every `/api` request: `limiters.api.byIp()` in the root `route.ts`.
+- Per endpoint, put `limiters.<name>.byIp()` **before** `validate(...)` so
+  malformed requests count too.
+- Per account: call `limiters.<name>.check(key)` inside the handler after
+  validation, e.g. login uses `${ip}:${email}`. Don't key lockouts by email
+  alone, or anyone can lock a real user out.
+- Client IP comes from `getClientIp(c)`: the **last** `X-Forwarded-For` entry
+  (the one Railway's proxy adds), not the first, which the client controls.
+- Counters live in process memory: they reset on restart/deploy and aren't
+  shared between instances. Move the store to Redis before running more than
+  one Railway replica.
+- Appwrite can also return 429; `fromAppwrite` maps it to the same error.

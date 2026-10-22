@@ -21,7 +21,7 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { loginSchema } from "../_lib/schemas"
 import { useLogin } from "../_hooks/use-auth"
-import { RATE_LIMIT_COOLDOWN_SECONDS, useCooldown } from "../_hooks/use-cooldown"
+import { formatCooldown, rateLimitWait, useCooldown } from "../_hooks/use-cooldown"
 import { AuthHeader } from "./auth-status"
 
 type FormData = z.infer<typeof loginSchema>
@@ -53,7 +53,7 @@ export function AuthForm({
     } catch (error) {
       // Credential errors stay form-level so we never hint at which field was wrong.
       const apiError = applyServerError(error, setError, ["email", "password"])
-      if (apiError.code === "RATE_LIMITED") startCooldown(RATE_LIMIT_COOLDOWN_SECONDS)
+      if (apiError.code === "RATE_LIMITED") startCooldown(rateLimitWait(apiError))
     }
   }
 
@@ -99,7 +99,7 @@ export function AuthForm({
                       {isPending
                         ? "Logging in…"
                         : cooldown > 0
-                          ? `Try again in ${cooldown}s`
+                          ? `Try again in ${formatCooldown(cooldown)}`
                           : "Login"}
                     </Button>
                   </Field>

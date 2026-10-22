@@ -18,7 +18,7 @@ import { Field, FieldDescription, FieldGroup } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
 import { forgotPasswordSchema } from "../_lib/schemas"
 import { useForgotPassword } from "../_hooks/use-auth"
-import { RATE_LIMIT_COOLDOWN_SECONDS, useCooldown } from "../_hooks/use-cooldown"
+import { formatCooldown, rateLimitWait, useCooldown } from "../_hooks/use-cooldown"
 import { AuthHeader, AuthStatus } from "./auth-status"
 
 const RESEND_COOLDOWN_SECONDS = 30
@@ -54,7 +54,7 @@ export function ForgotPasswordForm({
       startResendCooldown(RESEND_COOLDOWN_SECONDS)
     } catch (error) {
       const apiError = applyServerError(error, setError, ["email"])
-      if (apiError.code === "RATE_LIMITED") startRateLimitCooldown(RATE_LIMIT_COOLDOWN_SECONDS)
+      if (apiError.code === "RATE_LIMITED") startRateLimitCooldown(rateLimitWait(apiError))
     }
   }
 
@@ -68,7 +68,7 @@ export function ForgotPasswordForm({
     } catch (error) {
       // The message is rendered from forgotPasswordMutation.error below.
       if (error instanceof ApiError && error.code === "RATE_LIMITED") {
-        startResendCooldown(RATE_LIMIT_COOLDOWN_SECONDS)
+        startResendCooldown(rateLimitWait(error))
       }
     }
   }
@@ -117,7 +117,7 @@ export function ForgotPasswordForm({
                       {isPending
                         ? "Sending…"
                         : resendCooldown > 0
-                          ? `Resend email in ${resendCooldown}s`
+                          ? `Resend email in ${formatCooldown(resendCooldown)}`
                           : "Resend email"}
                     </Button>
                   </Field>
@@ -163,7 +163,7 @@ export function ForgotPasswordForm({
                         {isPending
                           ? "Sending link…"
                           : rateLimitCooldown > 0
-                            ? `Try again in ${rateLimitCooldown}s`
+                            ? `Try again in ${formatCooldown(rateLimitCooldown)}`
                             : "Send reset link"}
                       </Button>
                     </Field>

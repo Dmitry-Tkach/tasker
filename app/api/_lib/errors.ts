@@ -25,6 +25,7 @@ export class ApiHttpError extends Error {
 const RATE_LIMITED = new ApiHttpError(429, {
   code: 'RATE_LIMITED',
   message: 'Too many attempts. Please wait a minute and try again.',
+  retryAfter: 60,
 });
 
 const UPSTREAM = new ApiHttpError(502, {
@@ -118,7 +119,10 @@ const HTTP_EXCEPTION_CODES: Partial<Record<number, ApiErrorCode>> = {
 };
 
 export const onError: ErrorHandler = (err, c) => {
-  if (err instanceof ApiHttpError) return errorJson(c, err.status, err.info);
+  if (err instanceof ApiHttpError) {
+    if (err.info.retryAfter) c.header('Retry-After', String(err.info.retryAfter));
+    return errorJson(c, err.status, err.info);
+  }
   // Hono's own client errors, e.g. a malformed JSON body.
   if (err instanceof HTTPException && err.status < 500) {
     const code = HTTP_EXCEPTION_CODES[err.status] ?? 'INTERNAL';

@@ -21,7 +21,7 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { PASSWORD_MIN, registerSchema } from "../_lib/schemas"
 import { useRegister } from "../_hooks/use-auth"
-import { RATE_LIMIT_COOLDOWN_SECONDS, useCooldown } from "../_hooks/use-cooldown"
+import { formatCooldown, rateLimitWait, useCooldown } from "../_hooks/use-cooldown"
 import { AuthHeader } from "./auth-status"
 
 type FormData = z.infer<typeof registerSchema>
@@ -55,7 +55,7 @@ export function AuthForm({
       router.replace(signedIn ? "/" : "/login")
     } catch (error) {
       const apiError = applyServerError(error, setError, ["name", "email", "password"])
-      if (apiError.code === "RATE_LIMITED") startCooldown(RATE_LIMIT_COOLDOWN_SECONDS)
+      if (apiError.code === "RATE_LIMITED") startCooldown(rateLimitWait(apiError))
     }
   }
 
@@ -107,7 +107,7 @@ export function AuthForm({
                       {isPending
                         ? "Creating account…"
                         : cooldown > 0
-                          ? `Try again in ${cooldown}s`
+                          ? `Try again in ${formatCooldown(cooldown)}`
                           : "Create account"}
                     </Button>
                   </Field>

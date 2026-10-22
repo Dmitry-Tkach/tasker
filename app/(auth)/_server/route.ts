@@ -9,6 +9,7 @@ import {
   resetPasswordSchema,
 } from '../_lib/schemas';
 import { UNAUTHORIZED, fromAppwrite, validate } from '@/app/api/_lib/errors';
+import { getClientIp, limiters } from '@/app/api/_lib/rate-limit';
 
 export const SESSION_COOKIE = 'tasker-session';
 
@@ -23,7 +24,8 @@ const sessionCookieOptions = (expire: string) =>
   }) as const;
 
 const auth = new Hono()
-  .post('/register', validate('json', registerSchema), async (c) => {
+  // Rate limiters run before validation so malformed requests count too.
+  .post('/register', limiters.register.byIp(), validate('json', registerSchema), async (c) => {
     const { name, email, password } = c.req.valid('json');
     const { account } = createAdminClient();
 
@@ -46,8 +48,9 @@ const auth = new Hono()
       return c.json({ user, signedIn: false }, 201);
     }
   })
-  .post('/login', validate('json', loginSchema), async (c) => {
+  .post('/login', limiters.login.byIp(), validate('json', loginSchema), async (c) => {
     const { email, password } = c.req.valid('json');
+    limiters.loginAccount.check(`${getClientIp(c)}:${email.toLowerCase()}`);
     const { account } = createAdminClient();
 
     try {
@@ -83,8 +86,9 @@ const auth = new Hono()
     deleteCookie(c, SESSION_COOKIE, { path: '/' });
     return c.json({ success: true });
   })
-  .post('/recovery', validate('json', forgotPasswordSchema), async (c) => {
+  .post('/recovery', limiters.recoveryRequest.byIp(), validate('json', forgotPasswordSchema), async (c) => {
     const { email } = c.req.valid('json');
+    limiters.recoveryEmail.check(email.toLowerCase());
     const { account } = createAdminClient();
     // Appwrite emails a link to /reset-password?userId=...&secret=... The
     // host must be registered as a Web platform in the Appwrite project.
@@ -100,7 +104,7 @@ const auth = new Hono()
     }
     return c.json({ success: true });
   })
-  .put('/recovery', validate('json', resetPasswordSchema), async (c) => {
+  .put('/recovery', limiters.recoveryConfirm.byIp(), validate('json', resetPasswordSchema), async (c) => {
     const { userId, secret, password } = c.req.valid('json');
     const { account } = createAdminClient();
 

@@ -19,6 +19,8 @@ export type ApiErrorInfo = {
   message: string;
   /** Per-field messages, keyed by input name. */
   fields?: Record<string, string>;
+  /** For RATE_LIMITED: seconds until the request may be retried. */
+  retryAfter?: number;
 };
 
 export type ApiErrorBody = { error: ApiErrorInfo };
@@ -30,13 +32,15 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: ApiErrorCode;
   readonly fields?: Record<string, string>;
+  readonly retryAfter?: number;
 
-  constructor(status: number, { code, message, fields }: ApiErrorInfo) {
+  constructor(status: number, { code, message, fields, retryAfter }: ApiErrorInfo) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.fields = fields;
+    this.retryAfter = retryAfter;
   }
 }
 
