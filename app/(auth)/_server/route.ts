@@ -1,22 +1,11 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { z } from 'zod';
 import { ID } from 'node-appwrite';
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
 import { createAdminClient, createSessionClient } from './appwrite';
+import { loginSchema, registerSchema } from '../_lib/schemas';
 
 export const SESSION_COOKIE = 'tasker-session';
-
-const loginSchema = z.object({
-  email: z.email(),
-  password: z.string().min(8),
-});
-
-const registerSchema = z.object({
-  name: z.string().trim().min(1),
-  email: z.email(),
-  password: z.string().min(8),
-});
 
 // Options for the HTTP-only session cookie holding the Appwrite session secret.
 const sessionCookieOptions = (expire: string) =>
