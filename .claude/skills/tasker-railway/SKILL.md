@@ -31,9 +31,10 @@ and ships; it does NOT gate merges on tests — that's CI's job.
 ## Environment variables (set in Railway dashboard, NOT committed)
 - **`NEXT_PUBLIC_APP_URL`** — the deployed public URL (e.g.
   `https://tasker-production.up.railway.app` or the custom domain), **not**
-  localhost. The RPC client in `app/api/client.ts` reads this at build/runtime;
-  if unset, the client base URL is `undefined`. (Note `NEXT_PUBLIC_` vars are
-  inlined at build time, so a change requires a rebuild/redeploy.)
+  localhost. The server uses it to build the password-reset link sent by
+  Appwrite; if it's wrong, reset emails point at the wrong host. (The RPC
+  client doesn't need it: it calls the current origin.) `NEXT_PUBLIC_` vars
+  are inlined at build time, so a change requires a rebuild/redeploy.
 - **Database** — when we add Postgres, Railway injects `DATABASE_URL`; reference
   Railway's variable so it stays in sync.
 - `.env*` is gitignored — never commit secrets. Keep a committed

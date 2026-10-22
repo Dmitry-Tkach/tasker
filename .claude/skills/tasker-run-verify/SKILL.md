@@ -27,11 +27,10 @@ to confirm a change end-to-end.
 ## Environment — READ THIS, it's a common trap
 - Next.js loads env from **`.env.local` at the project root**, not `app/.env.local`.
   A file under `app/` will NOT be picked up.
-- Browser-exposed vars must be prefixed **`NEXT_PUBLIC_`**. The RPC client
-  (`app/api/client.ts`) reads `process.env.NEXT_PUBLIC_APP_URL`, so the env
-  must define `NEXT_PUBLIC_APP_URL` (e.g. `http://localhost:3000`).
-- If the API client base URL comes out `undefined`, this mismatch is almost
-  always why.
+- Browser-exposed vars must be prefixed **`NEXT_PUBLIC_`**.
+  `NEXT_PUBLIC_APP_URL` (e.g. `http://localhost:3000`) is used to build the
+  password-reset link; the RPC client doesn't need it (it calls the current
+  origin).
 
 ## After pulling / installing
 - `npm install` if `package.json` or the lockfile changed.

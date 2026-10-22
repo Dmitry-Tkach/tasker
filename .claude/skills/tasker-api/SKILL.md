@@ -67,9 +67,8 @@ const data = await unwrap<LoginResponse>(client.api.auth.login.$post({ json }));
 `unwrap` returns the JSON body on 2xx and throws `ApiError` otherwise (see
 "Errors" below). Type success bodies with a status filter, e.g.
 `InferResponseType<typeof login, 200>`.
-- `client` base URL = `process.env.NEXT_PUBLIC_APP_URL` + `/api`. That var must
-  exist in root `.env.local` with the `NEXT_PUBLIC_` prefix (see
-  `tasker-run-verify`), or the base URL is `undefined`.
+- `client` calls the current origin (`hc<AppType>('/')` → `/api/...`), so it
+  needs no env var but only works in the browser (client components/hooks).
 - Wrap mutations in a TanStack Query `useMutation` and reads in `useQuery`
   (provider already set up in `components/QueryProvider.tsx`).
 

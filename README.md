@@ -30,7 +30,7 @@ cp .env.example .env.local
 
 | Variable              | Description                                               |
 | --------------------- | --------------------------------------------------------- |
-| `NEXT_PUBLIC_APP_URL` | Public base URL of the app (used by the Hono RPC client). |
+| `NEXT_PUBLIC_APP_URL` | Public base URL of the app, used to build links in emails (password reset). |
 
 ## Scripts
 
@@ -47,5 +47,6 @@ Deployed on [Railway](https://railway.app) — auto-deploys on push to `main`,
 built with Nixpacks.
 
 - Set `NEXT_PUBLIC_APP_URL` in the Railway service variables to the public
-  domain. It is inlined at build time, so changing it requires a redeploy.
+  domain (used for password-reset links). It is inlined at build time, so
+  changing it requires a redeploy.
 - CI (lint / typecheck / build on PRs) runs via GitHub Actions.

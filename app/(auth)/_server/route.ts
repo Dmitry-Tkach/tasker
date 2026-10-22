@@ -92,10 +92,11 @@ const auth = new Hono()
     const { account } = createAdminClient();
     // Appwrite emails a link to /reset-password?userId=...&secret=... The
     // host must be registered as a Web platform in the Appwrite project.
-    const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(c.req.url).origin;
+    // new URL() also copes with a trailing slash in NEXT_PUBLIC_APP_URL.
+    const resetUrl = new URL('/reset-password', process.env.NEXT_PUBLIC_APP_URL || c.req.url).href;
 
     try {
-      await account.createRecovery({ email, url: `${origin}/reset-password` });
+      await account.createRecovery({ email, url: resetUrl });
     } catch (e) {
       // Answer an unknown email exactly like a known one, so this endpoint
       // can't be used to find out which emails have accounts.
