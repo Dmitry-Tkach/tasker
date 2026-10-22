@@ -51,18 +51,22 @@ and consumed on the client via Hono's typed RPC client (`hc`).
    ```ts
    export const GET = handle(app);
    export const POST = handle(app);
-   // add PUT / PATCH / DELETE as needed
+   export const PUT = handle(app);
+   // add PATCH / DELETE as needed
    ```
-   ⚠️ Current `route.ts` exports **only `POST`** — any GET/DELETE/etc. will
-   404 until its handler is exported. Add the method export when you add the route.
+   ⚠️ Current `route.ts` exports `GET`, `POST` and `PUT` — PATCH/DELETE will
+   404 until their handler is exported. Add the method export when you add the route.
 
 ## Calling the API from the client
 Prefer the typed client over raw `fetch`:
 ```ts
 import { client } from '@/app/api/client';
-const res = await client.api.auth.login.$post({ json: { email, password } });
-const data = await res.json();   // typed from the server schema
+import { unwrap } from '@/lib/api-error';
+const data = await unwrap<LoginResponse>(client.api.auth.login.$post({ json }));
 ```
+`unwrap` returns the JSON body on 2xx and throws `ApiError` otherwise (see
+"Errors" below). Type success bodies with a status filter, e.g.
+`InferResponseType<typeof login, 200>`.
 - `client` base URL = `process.env.NEXT_PUBLIC_APP_URL` + `/api`. That var must
   exist in root `.env.local` with the `NEXT_PUBLIC_` prefix (see
   `tasker-run-verify`), or the base URL is `undefined`.
@@ -70,8 +74,37 @@ const data = await res.json();   // typed from the server schema
   (provider already set up in `components/QueryProvider.tsx`).
 
 ## Validation
-- Validate input with `zValidator('<target>', schema)` where target is
+- Validate input with `validate('<target>', schema)` from
+  `@/app/api/_lib/errors` (a `zValidator` wrapper), where target is
   `'json' | 'query' | 'param' | 'form' | 'header'`, then read it back with
-  `c.req.valid('<target>')`.
-- Reuse the same zod schema shape on the form (react-hook-form) and the server
-  so client and server validation stay in sync.
+  `c.req.valid('<target>')`. Don't use bare `zValidator`: its 400 body doesn't
+  follow the error contract.
+- Share one zod schema between the form and the route, in a zod-only file the
+  client can import (auth: `app/(auth)/_lib/schemas.ts`). Put user-facing
+  messages in the schema; they come back as `fields` on a `VALIDATION` error.
+
+## Errors
+Contract (`lib/api-error.ts`, shared by server and client): every non-2xx
+response is `{ error: { code, message, fields? } }`. `message` is always safe
+to show; `fields` maps input names to messages.
+
+Server (`app/api/_lib/errors.ts`, wired in the root `route.ts` via
+`app.onError` / `app.notFound`):
+- In a route, **throw** rather than returning error JSON:
+  `throw new ApiHttpError(status, { code, message, fields? })`, or a preset
+  (`UNAUTHORIZED`, `INVALID_CREDENTIALS`, `RECOVERY_LINK_INVALID`).
+- Wrap Appwrite calls: `catch (e) { throw fromAppwrite(e, '<context>') }`. It
+  logs Appwrite's message and maps the code to a safe error (429 → RATE_LIMITED,
+  5xx/network → UPSTREAM, plus per-context cases). **Never return
+  `e.message`** to the client.
+- Anything else thrown becomes a logged, generic 500 `INTERNAL`.
+- Thrown errors don't appear in the RPC types; only success responses do.
+  Keep error responses out of `c.json(...)` returns with non-literal statuses,
+  or they widen the success types.
+- Don't reveal whether an account exists: login uses one message for all
+  credential failures; recovery returns 200 for unknown emails.
+
+Client: hooks use `unwrap`, so `mutation.error` is an `ApiError`
+(`status`, `code`, `message`, `fields`; `status` 0 + `NETWORK` for offline).
+`QueryProvider` doesn't retry 4xx queries or any mutation. For forms, see the
+error pattern in `tasker-ui`.

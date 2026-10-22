@@ -21,25 +21,36 @@ Config in `components.json`.
 
 ## Forms (react-hook-form + zod)
 Established pattern (see `app/(auth)/components/*-form.tsx`):
-- Define a zod schema, derive the type with `z.infer`.
-- `useForm({ resolver: zodResolver(schema), defaultValues })`.
-- Build fields with the `Field` family: `FieldGroup`, `Field`, `FieldLabel`,
-  `FieldDescription`, `FieldSeparator` from `@/components/ui/field`, with
-  `Input` from `@/components/ui/input`.
-- Register inputs via `{...register("name")}` and show errors with
-  `<ErrorMessage control={control} name="..." render={({message}) => <p>{message}</p>} />`.
+- Use a shared zod schema (auth: `app/(auth)/_lib/schemas.ts`, also used by
+  the API) and derive the type with `z.infer`.
+- `useForm({ resolver: zodResolver(schema), defaultValues })`, rendered with
+  react-hook-form's `<Form onSubmit={({ data }) => onSubmit(data)} control={control}>`.
+- Layout with `FieldGroup` / `Field` / `FieldDescription` /
+  `FieldSeparator` from `@/components/ui/field`.
+- **Inputs: use `FormInput`** from `@/components/form/form-input`
+  (`control`, `name`, `label`, optional `description` hint and `labelAction`,
+  plus any input props). It wires `data-invalid`, `aria-invalid`,
+  `aria-describedby` (hint + error) and shows client and server errors the
+  same way. Don't hand-roll `ErrorMessage` + `<p>`.
 
-### ⚠️ Gotchas in the current auth forms (fix when you touch them)
-- **Missing `"use client"`.** These components use `useForm` (a hook) but have
-  no `"use client"` directive — required for client components in Next 16.
-  Add it as the first line.
-- **Submit path.** `login-form.tsx` calls `fetch('/api/auth/login')` directly;
-  prefer the typed Hono client + TanStack Query `useMutation` (see `tasker-api`).
-- **`register-form.tsx`** has a stray `action="/api/test"`, a submit button
-  labeled "Login", and an `ErrorMessage` for `password` placed outside its
-  `Field`. Clean these up when working in that file.
-- Both form components are named `AuthForm` (one per file) — fine, but rename
-  if you ever colocate them.
+### Errors pattern
+- Submit handler: `try { await mutation.mutateAsync(data); … } catch (error)
+  { applyServerError(error, setError, ["field", …]) }` (`@/lib/form-errors`).
+  It sends server `fields` to those inputs (focusing the first) and everything
+  else to `errors.root.server`. Always catch: an uncaught rejection from
+  `mutateAsync` surfaces as an unhandled error.
+- Render `<FormAlert message={errors.root?.server?.message} />`
+  (`@/components/form/form-alert`) under the form header.
+- Login-style forms: credential errors stay form-level, never on a field.
+- Disable the submit button with a `Spinner` while `mutation.isPending`.
+- On `RATE_LIMITED`, start `useCooldown()` from `app/(auth)/_hooks/use-cooldown`
+  with `RATE_LIMIT_COOLDOWN_SECONDS` and show "Try again in Ns".
+- Toasts are not for form errors.
+
+### Route-level errors
+`app/error.tsx`, `app/global-error.tsx` and `app/not-found.tsx` use
+`StatusPage` (`@/components/status-page`). Error boundaries get `retry`
+(not `reset`) in this Next version; never render `error.message`.
 
 ## Layout / styling
 - Global styles + theme tokens in `app/globals.css` (Tailwind v4,
