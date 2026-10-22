@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
-import { zValidator } from '@hono/zod-validator';
 import { ID } from 'node-appwrite';
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
 import { createAdminClient, createSessionClient } from './appwrite';
 import { loginSchema, registerSchema } from '../_lib/schemas';
+import { UNAUTHORIZED, fromAppwrite, validate } from '@/app/api/_lib/errors';
 
 export const SESSION_COOKIE = 'tasker-session';
 
@@ -18,22 +18,30 @@ const sessionCookieOptions = (expire: string) =>
   }) as const;
 
 const auth = new Hono()
-  .post('/register', zValidator('json', registerSchema), async (c) => {
+  .post('/register', validate('json', registerSchema), async (c) => {
     const { name, email, password } = c.req.valid('json');
     const { account } = createAdminClient();
 
+    let user;
     try {
-      await account.create({ userId: ID.unique(), email, password, name });
+      user = await account.create({ userId: ID.unique(), email, password, name });
+    } catch (e) {
+      throw fromAppwrite(e, 'register');
+    }
+
+    // The account exists at this point. If signing in fails, still report
+    // success so a retry doesn't hit "email already exists"; the client sends
+    // the user to the login page instead.
+    try {
       const session = await account.createEmailPasswordSession({ email, password });
       setCookie(c, SESSION_COOKIE, session.secret, sessionCookieOptions(session.expire));
-
-      const user = await createSessionClient(session.secret).account.get();
-      return c.json({ user }, 201);
+      return c.json({ user, signedIn: true }, 201);
     } catch (e) {
-      return c.json({ error: e instanceof Error ? e.message : 'Registration failed' }, 400);
+      console.error('[register] account created but sign-in failed', e);
+      return c.json({ user, signedIn: false }, 201);
     }
   })
-  .post('/login', zValidator('json', loginSchema), async (c) => {
+  .post('/login', validate('json', loginSchema), async (c) => {
     const { email, password } = c.req.valid('json');
     const { account } = createAdminClient();
 
@@ -44,18 +52,18 @@ const auth = new Hono()
       const user = await createSessionClient(session.secret).account.get();
       return c.json({ user });
     } catch (e) {
-      return c.json({ error: e instanceof Error ? e.message : 'Invalid credentials' }, 401);
+      throw fromAppwrite(e, 'login');
     }
   })
   .get('/me', async (c) => {
     const session = getCookie(c, SESSION_COOKIE);
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    if (!session) throw UNAUTHORIZED;
 
     try {
       const user = await createSessionClient(session).account.get();
       return c.json({ user });
-    } catch {
-      return c.json({ error: 'Unauthorized' }, 401);
+    } catch (e) {
+      throw fromAppwrite(e, 'session');
     }
   })
   .post('/logout', async (c) => {
