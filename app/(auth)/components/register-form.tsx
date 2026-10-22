@@ -1,108 +1,100 @@
 "use client"
 
-import { cn } from "cn"
-import * as z from "zod";
-import Image from 'next/image'
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { Form, useForm, SubmitHandler } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import type * as z from "zod"
+
+import { cn } from "@/lib/utils"
+import { applyServerError } from "@/lib/form-errors"
+import { FormAlert } from "@/components/form/form-alert"
+import { FormInput } from "@/components/form/form-input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import {Form, useForm, SubmitHandler, ErrorMessage} from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod";
-
 import {
   Field,
   FieldDescription,
   FieldGroup,
-  FieldLabel,
   FieldSeparator,
 } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import Link from "next/link";
-import { useRegister } from "../_hooks/use-auth";
+import { Spinner } from "@/components/ui/spinner"
+import { PASSWORD_MIN, registerSchema } from "../_lib/schemas"
+import { useRegister } from "../_hooks/use-auth"
+import { RATE_LIMIT_COOLDOWN_SECONDS, useCooldown } from "../_hooks/use-cooldown"
+import { AuthHeader } from "./auth-status"
 
-const formSchema = z.object({
-  name: z.string().trim().min(1, "Name is required"),
-  email: z.email("Invalid email"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});
-
+type FormData = z.infer<typeof registerSchema>
 
 export function AuthForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-
-
-
+  const router = useRouter()
   const {
     control,
-    register,
+    setError,
+    formState: { errors },
   } = useForm({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(registerSchema),
     defaultValues: {
-      name: '',
+      name: "",
       email: "",
       password: "",
-    }
-  });
+    },
+  })
 
-  const registerMutation = useRegister();
-
-  type FormData = z.infer<typeof formSchema>;
+  const registerMutation = useRegister()
+  const [cooldown, startCooldown] = useCooldown()
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
-    const result = await registerMutation.mutateAsync(data);
-    console.log("register result", result); // mock data for now
-  };
+    try {
+      const { signedIn } = await registerMutation.mutateAsync(data)
+      // The account can exist without a session if sign-in failed right after
+      // sign-up; send the user to log in rather than showing an error.
+      router.replace(signedIn ? "/" : "/login")
+    } catch (error) {
+      const apiError = applyServerError(error, setError, ["name", "email", "password"])
+      if (apiError.code === "RATE_LIMITED") startCooldown(RATE_LIMIT_COOLDOWN_SECONDS)
+    }
+  }
+
+  const isPending = registerMutation.isPending
 
   return (
-    <div className={cn("flex flex-col gap-6 justify-center", className)} {...props}>
+    <div className={cn("flex flex-col gap-6 justify-center px-4", className)} {...props}>
 
       <div className="flex justify-center">
-        <Card className="overflow-hidden p-0 w-100">
-          <CardContent className="">
-            <Form onSubmit={({data})=> onSubmit(data)} control={control} method="post">
-              <div className="p-6 md:p-8" >
+        <Card className="overflow-hidden p-0 w-full max-w-100">
+          <CardContent>
+            <Form onSubmit={({ data }) => onSubmit(data)} control={control} method="post">
+              <div className="p-6 md:p-8">
                 <FieldGroup>
-                  <div className="flex flex-col items-center gap-2 text-center">
-                    <Image
-                      className=""
-                      src="/multiple-defenses-svgrepo-com.svg"
-                      width={100}
-                      height={100}
-                      alt="logo"
-                    />
-                    <h1 className="text-2xl font-bold">Tasker</h1>
-                    <p className="text-balance text-muted-foreground">
-                      Sign up to your Acme Inc account
-                    </p>
-                  </div>
-                  <Field>
-                    <FieldLabel htmlFor="name">Name</FieldLabel>
-                    <Input
-                    {...register("name")}
-                      id="name"
-                      type="text"
-                      placeholder=""
-                
-                    />
-                    <ErrorMessage control={control} name="name" render={({ message }) => <p>{message}</p>}/>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="email">Email</FieldLabel>
-                    <Input
-                    {...register("email")}
-                      id="email"
-                      type="email"
-                      placeholder="m@example.com"
-                
-                    />
-                    <ErrorMessage control={control} name="email" render={({ message }) => <p>{message}</p>}/>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="password">Password</FieldLabel>
-                    <Input {...register("password", { required: "This field is required." })} id="password" type="password" required />
-                  </Field>
-                  <ErrorMessage control={control} name="password" render={({ message }) => <p>{message}</p>}/>
+                  <AuthHeader subtitle="Create your Tasker account" />
+                  <FormAlert message={errors.root?.server?.message} />
+                  <FormInput
+                    control={control}
+                    name="name"
+                    label="Name"
+                    type="text"
+                    autoComplete="name"
+                  />
+                  <FormInput
+                    control={control}
+                    name="email"
+                    label="Email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="m@example.com"
+                  />
+                  <FormInput
+                    control={control}
+                    name="password"
+                    label="Password"
+                    type="password"
+                    autoComplete="new-password"
+                    description={`At least ${PASSWORD_MIN} characters.`}
+                  />
                   <Link
                     href="/forgot-password"
                     className="-mt-5 self-end text-sm underline-offset-2 hover:underline"
@@ -110,7 +102,14 @@ export function AuthForm({
                     Forgot your password?
                   </Link>
                   <Field>
-                    <Button type="submit" variant="primary">Create account</Button>
+                    <Button type="submit" variant="primary" disabled={isPending || cooldown > 0}>
+                      {isPending && <Spinner aria-hidden="true" />}
+                      {isPending
+                        ? "Creating account…"
+                        : cooldown > 0
+                          ? `Try again in ${cooldown}s`
+                          : "Create account"}
+                    </Button>
                   </Field>
                   <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
                     Or continue with

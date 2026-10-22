@@ -102,11 +102,12 @@ export const validate = <Target extends keyof ValidationTargets, Schema extends 
     for (const issue of result.error.issues) {
       fields[issue.path.join('.')] ??= issue.message;
     }
-    return errorJson(c, 400, {
-      code: 'VALIDATION',
-      message: 'Please check the highlighted fields.',
-      fields,
-    });
+    // Literal 400 (not errorJson) so this response doesn't widen the routes'
+    // inferred success types for the RPC client.
+    const body: ApiErrorBody = {
+      error: { code: 'VALIDATION', message: 'Please check the highlighted fields.', fields },
+    };
+    return c.json(body, 400);
   });
 
 const HTTP_EXCEPTION_CODES: Partial<Record<number, ApiErrorCode>> = {

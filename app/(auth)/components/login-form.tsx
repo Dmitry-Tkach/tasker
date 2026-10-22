@@ -1,104 +1,107 @@
 "use client"
 
-import { cn } from "cn"
-import * as z from "zod";
-import Image from 'next/image'
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { Form, useForm, SubmitHandler } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import type * as z from "zod"
+
+import { cn } from "@/lib/utils"
+import { applyServerError } from "@/lib/form-errors"
+import { FormAlert } from "@/components/form/form-alert"
+import { FormInput } from "@/components/form/form-input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import {Form, useForm, SubmitHandler, ErrorMessage} from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod";
-import Link from "next/link";
-import { useLogin } from "../_hooks/use-auth";
-
 import {
   Field,
   FieldDescription,
   FieldGroup,
-  FieldLabel,
   FieldSeparator,
 } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Spinner } from "@/components/ui/spinner"
+import { loginSchema } from "../_lib/schemas"
+import { useLogin } from "../_hooks/use-auth"
+import { RATE_LIMIT_COOLDOWN_SECONDS, useCooldown } from "../_hooks/use-cooldown"
+import { AuthHeader } from "./auth-status"
 
-const formSchema = z.object({
-  email: z.email("Invalid email"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-});
-
+type FormData = z.infer<typeof loginSchema>
 
 export function AuthForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-
-
-
+  const router = useRouter()
   const {
     control,
-    register,
+    setError,
+    formState: { errors },
   } = useForm({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
       password: "",
-    }
-  });
+    },
+  })
 
-  const loginMutation = useLogin();
-
-  type FormData = z.infer<typeof formSchema>;
+  const loginMutation = useLogin()
+  const [cooldown, startCooldown] = useCooldown()
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
-    const result = await loginMutation.mutateAsync(data);
-    console.log("login result", result); // mock data for now
-  };
+    try {
+      await loginMutation.mutateAsync(data)
+      router.replace("/")
+    } catch (error) {
+      // Credential errors stay form-level so we never hint at which field was wrong.
+      const apiError = applyServerError(error, setError, ["email", "password"])
+      if (apiError.code === "RATE_LIMITED") startCooldown(RATE_LIMIT_COOLDOWN_SECONDS)
+    }
+  }
+
+  const isPending = loginMutation.isPending
 
   return (
-    <div className={cn("flex flex-col gap-6 justify-center", className)} {...props}>
+    <div className={cn("flex flex-col gap-6 justify-center px-4", className)} {...props}>
 
       <div className="flex justify-center">
-        <Card className="overflow-hidden p-0 w-100">
-          <CardContent className="">
-            <Form onSubmit={({data})=> onSubmit(data)} control={control} method="post">
-              <div className="p-6 md:p-8" >
+        <Card className="overflow-hidden p-0 w-full max-w-100">
+          <CardContent>
+            <Form onSubmit={({ data }) => onSubmit(data)} control={control} method="post">
+              <div className="p-6 md:p-8">
                 <FieldGroup>
-                  <div className="flex flex-col items-center gap-2 text-center">
-                    <Image
-                      className=""
-                      src="/multiple-defenses-svgrepo-com.svg"
-                      width={100}
-                      height={100}
-                      alt="logo"
-                    />
-                    <h1 className="text-2xl font-bold">Tasker</h1>
-                    <p className="text-balance text-muted-foreground">
-                      Login to your Acme Inc account
-                    </p>
-                  </div>
-                  <Field>
-                    <FieldLabel htmlFor="email">Email</FieldLabel>
-                    <Input
-                    {...register("email")}
-                      id="email"
-                      type="email"
-                      placeholder="m@example.com"
-                    />
-                    <ErrorMessage control={control} name="email" render={({ message }) => <p>{message}</p>}/>
-                  </Field>
-                  <Field>
-                    <div className="flex items-center">
-                      <FieldLabel htmlFor="password">Password</FieldLabel>
+                  <AuthHeader subtitle="Log in to your Tasker account" />
+                  <FormAlert message={errors.root?.server?.message} />
+                  <FormInput
+                    control={control}
+                    name="email"
+                    label="Email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="m@example.com"
+                  />
+                  <FormInput
+                    control={control}
+                    name="password"
+                    label="Password"
+                    type="password"
+                    autoComplete="current-password"
+                    labelAction={
                       <Link
                         href="/forgot-password"
-                        className="ml-auto text-sm underline-offset-2 hover:underline"
+                        className="text-sm underline-offset-2 hover:underline"
                       >
                         Forgot your password?
                       </Link>
-                    </div>
-                    <Input {...register("password")} id="password" type="password" required />
-                    <ErrorMessage control={control} name="password" render={({ message }) => <p>{message}</p>}/>
-                  </Field>
+                    }
+                  />
                   <Field>
-                    <Button type="submit" variant="primary">Login</Button>
+                    <Button type="submit" variant="primary" disabled={isPending || cooldown > 0}>
+                      {isPending && <Spinner aria-hidden="true" />}
+                      {isPending
+                        ? "Logging in…"
+                        : cooldown > 0
+                          ? `Try again in ${cooldown}s`
+                          : "Login"}
+                    </Button>
                   </Field>
                   <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
                     Or continue with
