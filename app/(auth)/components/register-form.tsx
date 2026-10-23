@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/field"
 import { Spinner } from "@/components/ui/spinner"
 import { PASSWORD_MIN, registerSchema } from "../_lib/schemas"
+import { loginPath } from "../_lib/session"
 import { useRegister } from "../_hooks/use-auth"
 import { formatCooldown, rateLimitWait, useCooldown } from "../_hooks/use-cooldown"
 import { AuthHeader } from "./auth-status"
@@ -27,9 +28,13 @@ import { AuthHeader } from "./auth-status"
 type FormData = z.infer<typeof registerSchema>
 
 export function AuthForm({
+  redirectTo = "/",
   className,
   ...props
-}: React.ComponentProps<"div">) {
+}: React.ComponentProps<"div"> & {
+  /** Same-site path to open after signing in. */
+  redirectTo?: string
+}) {
   const router = useRouter()
   const {
     control,
@@ -52,7 +57,8 @@ export function AuthForm({
       const { signedIn } = await registerMutation.mutateAsync(data)
       // The account can exist without a session if sign-in failed right after
       // sign-up; send the user to log in rather than showing an error.
-      router.replace(signedIn ? "/" : "/login")
+      router.replace(signedIn ? redirectTo : loginPath(redirectTo))
+      router.refresh()
     } catch (error) {
       const apiError = applyServerError(error, setError, ["name", "email", "password"])
       if (apiError.code === "RATE_LIMITED") startCooldown(rateLimitWait(apiError))

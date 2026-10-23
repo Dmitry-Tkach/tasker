@@ -126,3 +126,22 @@ configured `limiters`. Over the limit it throws a 429 `RATE_LIMITED`
   shared between instances. Move the store to Redis before running more than
   one Railway replica.
 - Appwrite can also return 429; `fromAppwrite` maps it to the same error.
+
+## Auth & protected pages
+- **Public pages** are listed in `PUBLIC_PATHS` (`app/(auth)/_lib/session.ts`);
+  every other page requires a session. Signed-in users are sent home from
+  `GUEST_ONLY_PATHS` (login/register/forgot-password).
+- **`proxy.ts`** (Next 16's renamed middleware) does optimistic redirects from
+  the cookie's presence only — no Appwrite calls there.
+- **Real check:** call `requireUser('<this path>')` from
+  `app/(auth)/_server/dal.ts` in every protected page (or wherever user data
+  is loaded). Use `getUser()` (memoized per request) just to read the user.
+  Don't rely on a layout alone: layouts don't re-render on navigation.
+- An invalid cookie makes `requireUser` redirect through
+  `GET /api/auth/expired`, which clears it and goes to `/login?next=…`
+  (otherwise proxy and page would bounce between `/` and `/login`).
+- Protected pages live in the `app/(app)/` route group, whose layout shows the
+  user + logout. Redirect targets from `?next=` must go through
+  `safeRedirectPath` (blocks off-site redirects).
+- API routes don't go through the proxy; check the session cookie in the
+  route itself (see `/me`).

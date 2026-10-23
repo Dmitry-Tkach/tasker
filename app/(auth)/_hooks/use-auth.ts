@@ -40,3 +40,10 @@ export const useResetPassword = () =>
   useMutation<InferResponseType<typeof confirmRecovery, 200>, ApiError, ResetPasswordInput>({
     mutationFn: (json) => unwrap(confirmRecovery({ json })),
   });
+
+const logout = client.api.auth.logout.$post;
+
+export const useLogout = () =>
+  useMutation<InferResponseType<typeof logout, 200>, ApiError, void>({
+    mutationFn: () => unwrap(logout()),
+  });

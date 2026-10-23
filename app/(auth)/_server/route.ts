@@ -10,8 +10,7 @@ import {
 } from '../_lib/schemas';
 import { UNAUTHORIZED, fromAppwrite, validate } from '@/app/api/_lib/errors';
 import { getClientIp, limiters } from '@/app/api/_lib/rate-limit';
-
-export const SESSION_COOKIE = 'tasker-session';
+import { SESSION_COOKIE, loginPath } from '../_lib/session';
 
 // Options for the HTTP-only session cookie holding the Appwrite session secret.
 const sessionCookieOptions = (expire: string) =>
@@ -85,6 +84,12 @@ const auth = new Hono()
     }
     deleteCookie(c, SESSION_COOKIE, { path: '/' });
     return c.json({ success: true });
+  })
+  // Pages redirect here (via requireUser) when the session cookie exists but
+  // Appwrite rejects it: clear the stale cookie, then go to login.
+  .get('/expired', (c) => {
+    deleteCookie(c, SESSION_COOKIE, { path: '/' });
+    return c.redirect(loginPath(c.req.query('next')));
   })
   .post('/recovery', limiters.recoveryRequest.byIp(), validate('json', forgotPasswordSchema), async (c) => {
     const { email } = c.req.valid('json');

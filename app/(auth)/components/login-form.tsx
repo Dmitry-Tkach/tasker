@@ -27,9 +27,13 @@ import { AuthHeader } from "./auth-status"
 type FormData = z.infer<typeof loginSchema>
 
 export function AuthForm({
+  redirectTo = "/",
   className,
   ...props
-}: React.ComponentProps<"div">) {
+}: React.ComponentProps<"div"> & {
+  /** Same-site path to open after signing in. */
+  redirectTo?: string
+}) {
   const router = useRouter()
   const {
     control,
@@ -49,7 +53,8 @@ export function AuthForm({
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     try {
       await loginMutation.mutateAsync(data)
-      router.replace("/")
+      router.replace(redirectTo)
+      router.refresh()
     } catch (error) {
       // Credential errors stay form-level so we never hint at which field was wrong.
       const apiError = applyServerError(error, setError, ["email", "password"])
