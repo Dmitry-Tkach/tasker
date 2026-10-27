@@ -1,17 +1,15 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { LogOutIcon } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
 import { useLogout } from "@/app/(auth)/_hooks/use-auth"
 
-export function LogoutButton() {
+/** Logs out, then sends the user to /login and drops the cached signed-in UI. */
+export function useSignOut() {
   const router = useRouter()
   const logoutMutation = useLogout()
 
-  const onLogout = async () => {
+  const signOut = async () => {
     try {
       await logoutMutation.mutateAsync()
     } catch {
@@ -22,10 +20,5 @@ export function LogoutButton() {
     router.refresh()
   }
 
-  return (
-    <Button variant="outline" size="sm" onClick={onLogout} disabled={logoutMutation.isPending}>
-      {logoutMutation.isPending ? <Spinner aria-hidden="true" /> : <LogOutIcon aria-hidden="true" />}
-      Log out
-    </Button>
-  )
+  return { signOut, isPending: logoutMutation.isPending }
 }
