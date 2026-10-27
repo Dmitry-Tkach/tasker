@@ -1,21 +1,52 @@
 import type { Metadata } from "next"
 
 import { requireUser } from "@/app/(auth)/_server/dal"
+import { workspacePath } from "@/app/(app)/_lib/nav"
+import { requireWorkspace } from "@/app/(workspaces)/_server/dal"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { PageHeader } from "../_components/page-header"
-import { initials } from "../_lib/initials"
+import { PageHeader } from "@/app/(app)/_components/page-header"
+import { WorkspaceAvatar } from "@/app/(app)/_components/workspace-avatar"
+import { initials } from "@/app/(app)/_lib/initials"
 
 export const metadata: Metadata = {
   title: "Settings · Tasker",
 }
 
-export default async function SettingsPage() {
-  const user = await requireUser("/settings")
+export default async function SettingsPage({ params }: PageProps<"/w/[slug]/settings">) {
+  const { slug } = await params
+  const user = await requireUser(workspacePath(slug, "/settings"))
+  const workspace = await requireWorkspace(slug)
 
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader title="Settings" description="Your account details." />
+      <PageHeader title="Settings" description="Your workspace and account details." />
+
+      <section aria-labelledby="workspace-heading" className="max-w-2xl">
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2 id="workspace-heading">Workspace</h2>
+            </CardTitle>
+            <CardDescription>Editing the workspace isn&apos;t available yet.</CardDescription>
+            <CardAction>
+              <WorkspaceAvatar size="lg" name={workspace.name} imageUrl={workspace.imageUrl} />
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            <dl className="divide-y rounded-lg border text-sm">
+              <div className="grid gap-1 px-4 py-3 sm:grid-cols-[8rem_1fr] sm:gap-4">
+                <dt className="font-medium text-muted-foreground">Name</dt>
+                <dd className="min-w-0 break-words">{workspace.name}</dd>
+              </div>
+              <div className="grid gap-1 px-4 py-3 sm:grid-cols-[8rem_1fr] sm:gap-4">
+                <dt className="font-medium text-muted-foreground">URL</dt>
+                <dd className="min-w-0 break-all font-mono text-xs leading-5">{workspacePath(workspace.slug)}</dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+      </section>
 
       <section aria-labelledby="profile-heading" className="max-w-2xl">
         <Card>

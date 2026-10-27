@@ -40,6 +40,8 @@ export const INVALID_CREDENTIALS = new ApiHttpError(401, {
 
 export const UNAUTHORIZED = new ApiHttpError(401, { code: 'UNAUTHORIZED', message: 'Unauthorized' });
 
+export const NOT_FOUND = new ApiHttpError(404, { code: 'NOT_FOUND', message: 'Not found' });
+
 export const RECOVERY_LINK_INVALID = new ApiHttpError(400, {
   code: 'RECOVERY_LINK_INVALID',
   message: 'This reset link is invalid or has expired.',
@@ -52,7 +54,7 @@ const PASSWORD_POLICY_MESSAGES: Record<string, string> = {
 };
 
 // 'recovery-request' sends the reset email; 'recovery' completes the reset.
-type AppwriteContext = 'login' | 'register' | 'recovery-request' | 'recovery' | 'session';
+type AppwriteContext = 'login' | 'register' | 'recovery-request' | 'recovery' | 'session' | 'workspace';
 
 /**
  * Maps an Appwrite error to a safe public ApiHttpError. Appwrite's own message
@@ -72,6 +74,9 @@ export function fromAppwrite(e: unknown, context: AppwriteContext): ApiHttpError
   if (context === 'login' && (e.code === 400 || e.code === 401)) return INVALID_CREDENTIALS;
   if (context === 'session' && e.code === 401) return UNAUTHORIZED;
   if (context === 'recovery' && (e.code === 401 || e.code === 404)) return RECOVERY_LINK_INVALID;
+  // Appwrite answers 404 for rows/files the user has no permission to read.
+  if (context === 'workspace' && e.code === 401) return UNAUTHORIZED;
+  if (context === 'workspace' && e.code === 404) return NOT_FOUND;
 
   if (context === 'register' && e.code === 409) {
     const message = 'An account with this email already exists.';

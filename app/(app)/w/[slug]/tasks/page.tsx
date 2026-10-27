@@ -2,16 +2,20 @@ import type { Metadata } from "next"
 import { ListTodoIcon, PlusIcon } from "lucide-react"
 
 import { requireUser } from "@/app/(auth)/_server/dal"
+import { workspacePath } from "@/app/(app)/_lib/nav"
+import { requireWorkspace } from "@/app/(workspaces)/_server/dal"
 import { Button } from "@/components/ui/button"
-import { EmptyState } from "../_components/empty-state"
-import { PageHeader } from "../_components/page-header"
+import { EmptyState } from "@/app/(app)/_components/empty-state"
+import { PageHeader } from "@/app/(app)/_components/page-header"
 
 export const metadata: Metadata = {
   title: "Tasks · Tasker",
 }
 
-export default async function TasksPage() {
-  await requireUser("/tasks")
+export default async function TasksPage({ params }: PageProps<"/w/[slug]/tasks">) {
+  const { slug } = await params
+  await requireUser(workspacePath(slug, "/tasks"))
+  await requireWorkspace(slug)
 
   return (
     <div className="flex flex-col gap-8">

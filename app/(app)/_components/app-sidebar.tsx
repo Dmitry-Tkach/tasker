@@ -1,6 +1,5 @@
 "use client"
 
-import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -17,13 +16,15 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { NAV_ITEMS, isActivePath } from "../_lib/nav"
+import { NAV_ITEMS, isActivePath, workspacePath } from "../_lib/nav"
+import type { Workspace } from "@/app/(workspaces)/_lib/workspace"
+import { WorkspaceSwitcher } from "./workspace-switcher"
 
 // Brand-blue active state, matching the `primary` button variant.
 const activeItemClass =
   "data-active:bg-blue-600/10 data-active:text-blue-700 data-active:hover:bg-blue-600/15 data-active:hover:text-blue-700 dark:data-active:bg-blue-400/15 dark:data-active:text-blue-300 dark:data-active:hover:text-blue-200"
 
-export function AppSidebar() {
+export function AppSidebar({ workspace, workspaces }: { workspace: Workspace; workspaces: Workspace[] }) {
   const pathname = usePathname()
   const { isMobile, setOpenMobile } = useSidebar()
 
@@ -41,21 +42,7 @@ export function AppSidebar() {
       <SidebarHeader className="h-14 justify-center border-b border-sidebar-border">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              size="lg"
-              className="h-10 gap-2.5 px-1 group-data-[collapsible=icon]:p-1!"
-              tooltip={tooltip("Tasker home")}
-              render={<Link href="/" onClick={closeOnMobile} />}
-            >
-              <Image
-                src="/multiple-defenses-svgrepo-com.svg"
-                width={24}
-                height={24}
-                alt=""
-                className="size-6 shrink-0"
-              />
-              <span className="text-base font-semibold tracking-tight">Tasker</span>
-            </SidebarMenuButton>
+            <WorkspaceSwitcher current={workspace} workspaces={workspaces} />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -67,15 +54,16 @@ export function AppSidebar() {
             <nav aria-label="Main">
               <SidebarMenu>
                 {NAV_ITEMS.map((item) => {
-                  const active = isActivePath(pathname, item.href)
+                  const href = workspacePath(workspace.slug, item.path)
+                  const active = isActivePath(pathname, workspace.slug, item.path)
                   return (
-                    <SidebarMenuItem key={item.href}>
+                    <SidebarMenuItem key={item.path}>
                       <SidebarMenuButton
                         isActive={active}
                         tooltip={tooltip(item.title)}
                         className={activeItemClass}
                         aria-current={active ? "page" : undefined}
-                        render={<Link href={item.href} onClick={closeOnMobile} />}
+                        render={<Link href={href} onClick={closeOnMobile} />}
                       >
                         <item.icon aria-hidden="true" />
                         <span>{item.title}</span>

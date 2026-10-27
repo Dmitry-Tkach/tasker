@@ -21,10 +21,12 @@ import { initials } from "../_lib/initials"
 interface UserMenuProps {
   name: string
   email: string
+  /** The current workspace's settings page. */
+  settingsHref: string
 }
 
 /** Avatar button in the top bar opening the account menu. */
-export function UserMenu({ name, email }: UserMenuProps) {
+export function UserMenu({ name, email, settingsHref }: UserMenuProps) {
   const { signOut, isPending } = useSignOut()
   const displayName = name || email
 
@@ -55,7 +57,7 @@ export function UserMenu({ name, email }: UserMenuProps) {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem render={<Link href="/settings" />}>
+        <DropdownMenuItem render={<Link href={settingsHref} />}>
           <SettingsIcon aria-hidden="true" />
           Settings
         </DropdownMenuItem>

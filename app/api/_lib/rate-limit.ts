@@ -107,4 +107,5 @@ export const limiters = {
   /** Caps reset emails to one address, so nobody can flood someone's inbox. */
   recoveryEmail: createRateLimiter({ name: 'recovery-email', limit: 3, windowMs: 60 * MINUTE }),
   recoveryConfirm: createRateLimiter({ name: 'recovery-confirm', limit: 10, windowMs: 15 * MINUTE }),
+  createWorkspace: createRateLimiter({ name: 'create-workspace', limit: 10, windowMs: 60 * MINUTE }),
 };
